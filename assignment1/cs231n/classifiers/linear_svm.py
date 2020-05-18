@@ -1,7 +1,7 @@
 from builtins import range
 import numpy as np
 from random import shuffle
-from past.builtins import xrange
+# from past.builtins import xrange
 
 def svm_loss_naive(W, X, y, reg):
     """
@@ -27,15 +27,21 @@ def svm_loss_naive(W, X, y, reg):
     num_classes = W.shape[1]
     num_train = X.shape[0]
     loss = 0.0
+    num_features = W.shape[0]
+    x_row_sum = np.zeros(num_features)
     for i in range(num_train):
         scores = X[i].dot(W)
         correct_class_score = scores[y[i]]
         for j in range(num_classes):
+            margin = scores[j] - correct_class_score + 1 # note delta = 1
             if j == y[i]:
                 continue
-            margin = scores[j] - correct_class_score + 1 # note delta = 1
+            
             if margin > 0:
                 loss += margin
+                dW[:, j] += X[i]
+                dW[:, y[i]] -= X[i]
+        
 
     # Right now the loss is a sum over all training examples, but we want it
     # to be an average instead so we divide by num_train.
@@ -53,8 +59,9 @@ def svm_loss_naive(W, X, y, reg):
     # code above to compute the gradient.                                       #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    dW /= num_train
 
-    pass
+    dW += reg  * 2 * W
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     
@@ -77,8 +84,18 @@ def svm_loss_vectorized(W, X, y, reg):
     # result in loss.                                                           #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    num_classes = W.shape[1]
+    num_train = X.shape[0]
 
-    pass
+    scores = X.dot(W)
+    y_scores = scores[list(range(num_train)), y].reshape(num_train, 1)
+    
+    margin = scores - y_scores + 1
+    margin[list(range(num_train)), y] = 0
+    mask = margin > 0
+    margin_mask = margin[mask]
+
+    loss = np.sum(margin_mask) / num_train + reg * np.sum(W * W)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -93,8 +110,38 @@ def svm_loss_vectorized(W, X, y, reg):
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    trans_matrix = np.zeros(margin.shape)
+    trans_matrix[margin > 0]  = 1
+
+    neg_count = np.sum(trans_matrix, axis = 1)
+    trans_matrix[np.arange(num_train), y] = -1 * neg_count
+
+    dW = X.T.dot(trans_matrix) / num_train + reg * 2 * W
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     return loss, dW
+
+if __name__ == '__main__':
+    W = np.array([[1, 2], 
+                    [2, 3], 
+                    [3, 4]])
+    X = np.array([[1, 2, 3], [3, 4, 5], [1, 3, 4]])
+    y = np.array([0, 1, 0])
+    score = X.dot(W)
+    print(score)
+    y_socre = score[[0, 1, 2], y]
+    print(y_socre)
+    margin = score - y_socre.reshape(3, 1) + 1
+    score[[0, 1, 2], y] = 0
+    print(margin)
+    trans = np.zeros(margin.shape)
+    trans[margin > 0] = 1
+    neg_count = np.sum(trans, axis = 1)
+    trans[np.arange(3), y] = -1 * neg_count
+    print(trans)
+    print(neg_count)
+
+    
+    
+
