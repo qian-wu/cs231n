@@ -80,7 +80,10 @@ class TwoLayerNet(object):
         #############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        h1_score = X.dot(W1) + b1
+        h1_score[h1_score < 0] = 0 # after ReLU
+
+        scores = h1_score.dot(W2) + b2
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -98,7 +101,12 @@ class TwoLayerNet(object):
         #############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        scores -= np.max(scores, axis=1).reshape(N, -1)
+        e_y = np.exp(scores)
+        sum_e_y = np.sum(e_y, axis=1)
+        prob = e_y / sum_e_y.reshape(N, -1)
+        loss = -1 * np.log(prob[np.arange(N), y])
+        loss = np.sum(loss) / N + 0.5 * reg * (np.sum(W2 * W2) + np.sum(W1 * W1))
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -111,7 +119,24 @@ class TwoLayerNet(object):
         #############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        zero_mask = np.zeros((N, W2.shape[1]))
+        zero_mask[np.arange(N), y] = 1
+        # print((e_y - zero_mask).shape, sum_e_y.shape)
+        S = (prob - zero_mask) / N
+        W2_grads = h1_score.T.dot(S) + reg * W2
+        b2_grads = np.sum(S, axis = 0)
+
+        grads['W2'] = W2_grads
+        grads['b2'] = b2_grads
+
+        S1 = S.dot(W2.T)
+        S1[h1_score == 0] = 0
+        W1_grads = X.T.dot(S1) + reg * W1
+        b1_grads = np.sum(S1, axis = 0)
+
+        grads['W1'] = W1_grads
+        grads['b1'] = b1_grads
+
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
