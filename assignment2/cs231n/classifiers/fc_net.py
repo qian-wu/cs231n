@@ -55,7 +55,15 @@ class TwoLayerNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        W1 = np.random.normal(0.0, weight_scale, size = (input_dim, hidden_dim))
+        b1 = np.zeros(hidden_dim)
+        W2 = np.random.normal(0.0, weight_scale, size = (hidden_dim, num_classes))
+        b2 = np.zeros(num_classes)
+
+        self.params['W1'] = W1
+        self.params['b1'] = b1
+        self.params['W2'] = W2
+        self.params['b2'] = b2
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -88,7 +96,18 @@ class TwoLayerNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        W1 = self.params['W1']
+        b1 = self.params['b1']
+        W2 = self.params['W2']
+        b2 = self.params['b2']
+
+        h1_out, h1_cache = affine_forward(X, W1, b1)
+        h1_relu, relu_cache = relu_forward(h1_out)
+        h2_out, h2_cache = affine_forward(h1_relu, W2, b2)
+        scores = h2_out
+        out, dout = softmax_loss(scores, y)
+        
+        # print(loss)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -112,7 +131,18 @@ class TwoLayerNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        loss = out + 0.5 * self.reg * (np.sum(W1 * W1) + np.sum(W2 * W2))
+        # dout = dout + self.reg * (np.sum(W1) + np.sum(W2))
+        dh2, dw2, db2 = affine_backward(dout, h2_cache)
+        dw2 = dw2 + self.reg * W2
+        drelu = relu_backward(dh2, relu_cache)
+        dh1, dw1, db1 = affine_backward(drelu, h1_cache)
+        dw1 = dw1 + self.reg * W1
+
+        grads['W2'] = dw2
+        grads['b2'] = db2
+        grads['W1'] = dw1
+        grads['b1'] = db1
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -192,7 +222,10 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        W1 = np.random.normal(0.0, weight_scale, size = (input_dim, hidden_dims[0]))
+        b1 = np.zeros(hidden_dim[0])
+        
+
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
