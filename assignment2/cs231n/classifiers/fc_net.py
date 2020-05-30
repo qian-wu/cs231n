@@ -221,8 +221,25 @@ class FullyConnectedNet(object):
         # parameters should be initialized to zeros.                               #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
+        num_hiddens = len(hidden_dims)
+        if num_hiddens == 0 :
+            self.params['W1'] = np.random.normal(0.0, weight_scale, size = (input_dim, num_classes)).astype(self.dtype)
+            self.params['b1'] = np.zeros(num_classes).astype(self.dtype)
+        if num_hiddens > 0 :
+            max_layer = 1
+            self.params['W1'] = np.random.normal(0.0, weight_scale, size = (input_dim, hidden_dims[0])).astype(self.dtype)
+            self.params['b1'] = np.zeros(hidden_dims[0]).astype(self.dtype)
+            if num_hiddens > 1 :
+                for idx in range(1, len(hidden_dims)) :
+                    w_name = 'W' + str(idx + 1)
+                    b_name = 'b' + str(idx + 1)
+                    self.params[w_name] = np.random.normal(0.0, weight_scale, 
+                                                            size = (hidden_dims[idx - 1], hidden_dims[idx])).astype(self.dtype)
+                    self.params[b_name] = np.zeros(hidden_dims[idx]).astype(self.dtype)
+                    max_layer += 1
+            self.params['W' + str(max_layer + 1)] = np.random.normal(0.0, weight_scale, 
+                                                                        size = (hidden_dims[max_layer - 1], num_classes)).astype(self.dtype)
+            self.params['b' + str(max_layer + 1)] = np.zeros(num_classes).astype(self.dtype)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -283,8 +300,32 @@ class FullyConnectedNet(object):
         # layer, etc.                                                              #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        # print([(key, value.shape) for key, value in self.params.items()])
+        cache_list = []
+        W_sum = 0.0
+        if self.num_layers == 1 :
+            W1 = self.params['W1']
+            b1 = self.params['b1']
+            W_sum = np.sum(W1 * W1)
+            scores, cache = affine_forward(X, W1, b1)
+        if self.num_layers > 1 :
+            scores = X
+            for idx in range(1, self.num_layers) :
+                W_name, b_name = 'W' + str(idx), 'b' + str(idx) 
+                W_tmp = self.params[W_name]
+                b_tmp = self.params[b_name]
+                # print('get %s %s shape %s %s' % (W_name, b_name, W_tmp.shape, b_tmp.shape))
+                af_score, af_cache = affine_forward(scores, W_tmp, b_tmp)
+                relu_score, relu_cache = relu_forward(af_score)
 
-        pass
+                cache_list.append((af_score, af_cache, relu_score, relu_cache))
+                W_sum += np.sum(W_tmp * W_tmp)
+                scores = relu_score
+
+            W_end, b_end = self.params['W' + str(self.num_layers)], self.params['b' + str(self.num_layers)]
+            scores, cache_end = affine_forward(scores, W_end, b_end)
+            W_sum += np.sum(W_end * W_end)
+
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -295,7 +336,7 @@ class FullyConnectedNet(object):
         if mode == "test":
             return scores
 
-        loss, grads = 0.0, {}
+        loss, grads = scores, {}
         ############################################################################
         # TODO: Implement the backward pass for the fully-connected net. Store the #
         # loss in the loss variable and gradients in the grads dictionary. Compute #
@@ -311,7 +352,27 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        out, dout = softmax_loss(scores, y)
+        loss = out + 0.5 * self.reg * W_sum
+
+        dout, dw_end, db_end = affine_backward(dout, cache_end)
+        dw_end += self.reg * self.params['W' + str(self.num_layers)]
+        grads['W' + str(self.num_layers)] = dw_end
+        grads['b' + str(self.num_layers)] = db_end
+        # print('W%d %s b%d %s' % (self.num_layers, dw_end.shape, self.num_layers, db_end.shape))
+
+        if self.num_layers > 1 :
+            tmp_score = dout
+            for idx in reversed(range(1, self.num_layers)):
+                af_score, af_cache, relu_score, relu_cache = cache_list.pop()
+                # print(af_score.shape, relu_score.shape)
+                drelu = relu_backward(tmp_score, relu_cache)
+                tmp_score, dw, db = affine_backward(drelu, af_cache)
+                dw += self.reg * self.params['W' + str(idx)]
+                grads['W' + str(idx)] = dw
+                grads['b' + str(idx)] = db
+                # print('dW%d %s db%d %s' % (idx, dw.shape, idx, db.shape))
+
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
