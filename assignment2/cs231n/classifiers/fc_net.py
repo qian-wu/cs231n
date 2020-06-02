@@ -229,6 +229,9 @@ class FullyConnectedNet(object):
             max_layer = 1
             self.params['W1'] = np.random.normal(0.0, weight_scale, size = (input_dim, hidden_dims[0])).astype(self.dtype)
             self.params['b1'] = np.zeros(hidden_dims[0]).astype(self.dtype)
+            if self.normalization == "batchnorm" or self.normalization == "layernorm":
+                self.params['gamma1'] = np.ones(hidden_dims[0])
+                self.params['beta1'] = np.zeros(hidden_dims[0])
             if num_hiddens > 1 :
                 for idx in range(1, len(hidden_dims)) :
                     w_name = 'W' + str(idx + 1)
@@ -236,10 +239,17 @@ class FullyConnectedNet(object):
                     self.params[w_name] = np.random.normal(0.0, weight_scale, 
                                                             size = (hidden_dims[idx - 1], hidden_dims[idx])).astype(self.dtype)
                     self.params[b_name] = np.zeros(hidden_dims[idx]).astype(self.dtype)
+
+                    if self.normalization == "batchnorm" or self.normalization == "layernorm":
+                        self.params['gamma' + str(idx + 1)] = np.ones(hidden_dims[idx])
+                        self.params['beta' + str(idx + 1)] = np.zeros(hidden_dims[idx])
+
                     max_layer += 1
             self.params['W' + str(max_layer + 1)] = np.random.normal(0.0, weight_scale, 
                                                                         size = (hidden_dims[max_layer - 1], num_classes)).astype(self.dtype)
             self.params['b' + str(max_layer + 1)] = np.zeros(num_classes).astype(self.dtype)
+
+            # print([(key, value.shape) for key, value in self.params.items()])
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -316,9 +326,22 @@ class FullyConnectedNet(object):
                 b_tmp = self.params[b_name]
                 # print('get %s %s shape %s %s' % (W_name, b_name, W_tmp.shape, b_tmp.shape))
                 af_score, af_cache = affine_forward(scores, W_tmp, b_tmp)
-                relu_score, relu_cache = relu_forward(af_score)
-
-                cache_list.append((af_score, af_cache, relu_score, relu_cache))
+                # add batchnorm
+                if self.normalization == "batchnorm":
+                    gamma_name, beta_name = 'gamma' + str(idx), 'b' + str(idx)
+                    bn_score, bn_cache = batchnorm_forward(af_score, self.params[gamma_name], 
+                                                            self.params[beta_name], self.bn_params[idx - 1])
+                    relu_score, relu_cache = relu_forward(bn_score)
+                    cache_list.append((af_score, af_cache, bn_score, bn_cache, relu_score, relu_cache))
+                if self.normalization == "layernorm":
+                    gamma_name, beta_name = 'gamma' + str(idx), 'b' + str(idx)
+                    ln_score, ln_cache = layernorm_forward(af_score, self.params[gamma_name], 
+                                                            self.params[beta_name], self.bn_params[idx - 1])
+                    relu_score, relu_cache = relu_forward(ln_score)
+                    cache_list.append((af_score, af_cache, ln_score, ln_cache, relu_score, relu_cache))
+                else :
+                    relu_score, relu_cache = relu_forward(af_score)
+                    cache_list.append((af_score, af_cache, relu_score, relu_cache))
                 W_sum += np.sum(W_tmp * W_tmp)
                 scores = relu_score
 
@@ -364,14 +387,66 @@ class FullyConnectedNet(object):
         if self.num_layers > 1 :
             tmp_score = dout
             for idx in reversed(range(1, self.num_layers)):
-                af_score, af_cache, relu_score, relu_cache = cache_list.pop()
-                # print(af_score.shape, relu_score.shape)
-                drelu = relu_backward(tmp_score, relu_cache)
-                tmp_score, dw, db = affine_backward(drelu, af_cache)
+
+                if self.normalization == "batchnorm":
+                    af_score, af_cache, bn_score, bn_cache, relu_score, relu_cache = cache_list.pop()
+                elif self.normalization == "layernorm":
+                    af_score, af_cache, ln_score, ln_cache, relu_score, relu_cache = cache_list.pop()
+                else:
+                    af_score, af_cache, relu_score, relu_cache = cache_list.pop()
+
+                tmp = relu_backward(tmp_score, relu_cache)
+
+                if self.normalization == "batchnorm":
+                    tmp, dgamma, dbeta = batchnorm_backward_alt(tmp, bn_cache)
+                elif self.normalization == "layernorm":
+                    tmp, dgamma, dbeta = layernorm_backward(tmp, ln_cache)
+
+                tmp_score, dw, db = affine_backward(tmp, af_cache)
                 dw += self.reg * self.params['W' + str(idx)]
                 grads['W' + str(idx)] = dw
                 grads['b' + str(idx)] = db
+
+                if self.normalization == "batchnorm" or self.normalization == "layernorm":
+                    grads['gamma' + str(idx)] = dgamma
+                    grads['beta' + str(idx)] = dbeta
                 # print('dW%d %s db%d %s' % (idx, dw.shape, idx, db.shape))
+
+            # if self.normalization == "batchnorm":
+            #     for idx in reversed(range(1, self.num_layers)):
+            #         af_score, af_cache, bn_score, bn_cache, relu_score, relu_cache = cache_list.pop()
+            #         # print(af_score.shape, relu_score.shape)
+            #         drelu = relu_backward(tmp_score, relu_cache)
+            #         dbn, dgamma, dbeta = batchnorm_backward_alt(drelu, bn_cache)
+            #         tmp_score, dw, db = affine_backward(dbn, af_cache)
+            #         dw += self.reg * self.params['W' + str(idx)]
+            #         grads['W' + str(idx)] = dw
+            #         grads['b' + str(idx)] = db
+            #         grads['gamma' + str(idx)] = dgamma
+            #         grads['beta' + str(idx)] = dbeta
+            #         # print('dW%d %s db%d %s' % (idx, dw.shape, idx, db.shape))
+            # elif self.normalization == "layernorm":
+            #     for idx in reversed(range(1, self.num_layers)):
+            #         af_score, af_cache, ln_score, ln_cache, relu_score, relu_cache = cache_list.pop()
+            #         # print(af_score.shape, relu_score.shape)
+            #         drelu = relu_backward(tmp_score, relu_cache)
+            #         dln, dgamma, dbeta = layernorm_backward(drelu, ln_cache)
+            #         tmp_score, dw, db = affine_backward(dln, af_cache)
+            #         dw += self.reg * self.params['W' + str(idx)]
+            #         grads['W' + str(idx)] = dw
+            #         grads['b' + str(idx)] = db
+            #         grads['gamma' + str(idx)] = dgamma
+            #         grads['beta' + str(idx)] = dbeta
+            # else :
+            #     for idx in reversed(range(1, self.num_layers)):
+            #         af_score, af_cache, relu_score, relu_cache = cache_list.pop()
+            #         # print(af_score.shape, relu_score.shape)
+            #         drelu = relu_backward(tmp_score, relu_cache)
+            #         tmp_score, dw, db = affine_backward(drelu, af_cache)
+            #         dw += self.reg * self.params['W' + str(idx)]
+            #         grads['W' + str(idx)] = dw
+            #         grads['b' + str(idx)] = db
+            #         # print('dW%d %s db%d %s' % (idx, dw.shape, idx, db.shape))
 
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
