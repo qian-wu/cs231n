@@ -559,8 +559,32 @@ def conv_forward_naive(x, w, b, conv_param):
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    stride = conv_param.get('stride', 1)
+    pad = conv_param.get('pad', 0)
 
-    pass
+    N, C, H, W = x.shape
+    F, C, HH, WW = w.shape
+
+    out_H = int(1 + (H + 2 * pad - HH) / stride)
+    out_W = int(1 + (W + 2 * pad - WW) / stride)
+    out = np.zeros((N, F, out_H, out_W))
+
+    x = np.pad(x, ((0, 0), (0, 0), (pad, pad), (pad, pad)), mode = 'constant')
+    # print('x', np.around(x,2), 'w', np.around(w, 2))
+
+    for n in range(N):
+        for f in range(F):
+            for r in range(out_H):
+                for c in range(out_W):
+                    img = x[n, :, r * stride : r * stride + HH, c * stride : c * stride + WW]
+                    kernel = w[f, :, :, :]
+                    out[n, f, r, c] = np.sum(img * kernel) + b[f]
+                    # print(n, f, r * stride, ':', r * stride + HH, c * stride, ':', c * stride + WW)
+                    # print(n, f, 0, ':', HH, 0, ':', WW)
+                    # print('image', np.around(img, 2))
+                    # print('kernel', np.around(kernel))
+
+    # print(out)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
