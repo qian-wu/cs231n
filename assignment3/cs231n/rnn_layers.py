@@ -36,7 +36,9 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    score = x.dot(Wx) + prev_h.dot(Wh) + b
+    next_h = np.tanh(score)
+    cache = (score, x, prev_h, Wx, Wh, b)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -69,7 +71,13 @@ def rnn_step_backward(dnext_h, cache):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    score, x, prev_h, Wx, Wh, b = cache
+    dtanh = dnext_h * (1 - np.tanh(score) ** 2)
+    dx = dtanh.dot(Wx.T)
+    dprev_h = dtanh.dot(Wh.T)
+    dWx = x.T.dot(dtanh)
+    dWh = prev_h.T.dot(dtanh)
+    db = np.sum(dtanh, axis = 0)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -104,8 +112,17 @@ def rnn_forward(x, h0, Wx, Wh, b):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, T, D = x.shape
+    _, H = h0.shape
+    h = np.zeros((N, T+1, H))
 
+    h[:, 0, :] = h0
+    cache = []
+    for i in range(T):
+        x_t = x[:, i, :]
+        h[:, i+1, :], _cache = rnn_step_forward(x_t, h[:, i, :], Wx, Wh, b)
+        cache.append(_cache)
+    h = h[:, 1:, :]
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
     #                               END OF YOUR CODE                             #
@@ -140,7 +157,13 @@ def rnn_backward(dh, cache):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, T, H = dh.shape
+    _, x, _, _, _, _ = cache[0]
+    _, D = x.shape
+
+    dx = np.zeros((N, T, D))
+    for i in range(T-1, 0, -1):
+        dx[:, i, :], dprev_h, dWx, dWh, db = rnn_step_backward(dh[:, i, :], cache[i])
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
