@@ -151,7 +151,23 @@ class CaptioningRNN(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        h0 = features.dot(W_proj) + b_proj
+        x, cache_wemb = word_embedding_forward(captions_in, W_embed)
+        if self.cell_type == 'rnn':
+            h, cache_rnn = rnn_forward(x, h0, Wx, Wh, b)
+        else:
+            h, cache_lstm = lstm_forward(x, h0, Wx, Wh, b)
+        scores, cache_fc = temporal_affine_forward(h, W_vocab, b_vocab) 
+        loss, dout = temporal_softmax_loss(scores, captions_out, mask)
+
+        dfc, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dout, cache_fc)
+        if self.cell_type == 'rnn':
+            drnn, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dfc, cache_rnn)
+        else:
+            drnn, dh0, grads['Wx'], grads['Wh'], grads['b'] = lstm_backward(dfc, cache_lstm)
+        grads['W_embed'] = word_embedding_backward(drnn, cache_wemb)
+        grads['W_proj'] = features.T.dot(dh0)
+        grads['b_proj'] = np.sum(dh0, axis = 0)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -219,7 +235,33 @@ class CaptioningRNN(object):
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        h = features.dot(W_proj) + b_proj
+        N, T = h.shape
+        H, _ = Wh.shape
+
+        x = self._start
+        c = np.zeros((N, H))
+        for i in range(N):
+            h_curr = h[i, :]
+            c_curr = c[i, :]
+            for t in range(max_length):
+                # if x != self._start:
+                x = np.array(x).reshape(1, 1)
+                x, _ = word_embedding_forward(x, W_embed)
+
+                if self.cell_type == 'rnn':
+                    h_curr, _ = rnn_step_forward(x, h_curr, Wx, Wh, b)
+                else:
+                    x = x.reshape((1, -1))
+                    h_curr = h_curr.reshape((1, -1))
+                    c_curr = c_curr.reshape((1, -1))
+                    h_curr, c_curr, _ = lstm_step_forward(x, h_curr, c_curr, Wx, Wh, b)
+                    h_curr = h_curr.reshape((1, 1, -1))
+                score, _ = temporal_affine_forward(h_curr, W_vocab, b_vocab) 
+                x = np.argmax(score)
+                captions[i, t] = x
+                if x == self._end:
+                    break
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
