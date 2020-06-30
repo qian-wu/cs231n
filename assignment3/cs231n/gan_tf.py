@@ -16,7 +16,7 @@ def leaky_relu(x, alpha=0.01):
     # TODO: implement leaky ReLU
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    return tf.maximum(x, alpha * x)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     
@@ -35,7 +35,7 @@ def sample_noise(batch_size, dim, seed=None):
     # TODO: sample and return noise
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    return tf.random.uniform(shape = [batch_size, dim], minval = -1, maxval = 1)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     
@@ -60,7 +60,13 @@ def discriminator(seed=None):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    model = tf.keras.models.Sequential()
+
+    model.add(tf.keras.layers.Dense(256, input_shape=(784, ), use_bias=True))
+    model.add(tf.keras.layers.LeakyReLU(alpha=0.01))
+    model.add(tf.keras.layers.Dense(256, use_bias=True))
+    model.add(tf.keras.layers.LeakyReLU(alpha=0.01))
+    model.add(tf.keras.layers.Dense(1, use_bias=True))
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -88,7 +94,12 @@ def generator(noise_dim=NOISE_DIM, seed=None):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    model = tf.keras.models.Sequential()
+
+    model.add(tf.keras.layers.Dense(1024, input_shape=(noise_dim, ), use_bias=True, activation='relu'))
+    model.add(tf.keras.layers.Dense(1024, use_bias=True, activation='relu'))
+    model.add(tf.keras.layers.Dense(784, use_bias=True, activation='tanh'))
+
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -110,8 +121,9 @@ def discriminator_loss(logits_real, logits_fake):
     loss = None
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
-
+    bc = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+    loss = bc(tf.ones_like(logits_real), logits_real) + \
+            bc(tf.zeros_like(logits_fake), logits_fake)
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     return loss
 
@@ -128,7 +140,8 @@ def generator_loss(logits_fake):
     loss = None
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    bc = tf.keras.losses.BinaryCrossentropy(from_logits = True)
+    loss = bc(tf.ones_like(logits_fake), logits_fake)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     return loss
@@ -150,7 +163,8 @@ def get_solvers(learning_rate=1e-3, beta1=0.5):
     G_solver = None
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    D_solver = tf.optimizers.Adam(learning_rate = 1e-3, beta_1 = 0.5)
+    G_solver = tf.optimizers.Adam(learning_rate = 1e-3, beta_1 = 0.5)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     return D_solver, G_solver
@@ -169,7 +183,8 @@ def ls_discriminator_loss(scores_real, scores_fake):
     loss = None
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    loss = 0.5 * tf.reduce_mean((scores_real - tf.ones_like(scores_real)) ** 2) + \
+            0.5 * tf.reduce_mean(scores_fake ** 2)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     return loss
@@ -187,7 +202,7 @@ def ls_generator_loss(scores_fake):
     loss = None
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    loss = 0.5 * tf.reduce_mean((scores_fake - tf.ones_like(scores_fake)) ** 2)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     return loss
@@ -210,7 +225,19 @@ def dc_discriminator():
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    model = tf.keras.models.Sequential()
+
+    model.add(tf.keras.layers.Reshape((28, 28, 1), input_shape=(784, )))
+    model.add(tf.keras.layers.Conv2D(32, 5))
+    model.add(tf.keras.layers.LeakyReLU(alpha=0.01))
+    model.add(tf.keras.layers.MaxPool2D(pool_size=(2,2), strides=2))
+    model.add(tf.keras.layers.Conv2D(64, 5))
+    model.add(tf.keras.layers.LeakyReLU(alpha=0.01))
+    model.add(tf.keras.layers.MaxPool2D(pool_size=(2,2), strides=2))
+    model.add(tf.keras.layers.Flatten())
+    model.add(tf.keras.layers.Dense(4 * 4 * 64))
+    model.add(tf.keras.layers.LeakyReLU(alpha=0.01))
+    model.add(tf.keras.layers.Dense(1))
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -232,7 +259,16 @@ def dc_generator(noise_dim=NOISE_DIM):
     # TODO: implement architecture
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    model = tf.keras.models.Sequential()
+
+    model.add(tf.keras.layers.Dense(1024, input_shape=(noise_dim, ), activation='relu'))
+    model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.Dense(7 * 7 * 128, activation='relu'))
+    model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.Reshape((7, 7, 128)))
+    model.add(tf.keras.layers.Conv2DTranspose(64, 4, strides=2, activation='relu', padding='same'))
+    model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.Conv2DTranspose(1, 4, strides=2, activation='tanh', padding='same'))
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     return model
